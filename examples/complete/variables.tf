@@ -30,6 +30,25 @@ variable "oci_region" {
   default     = "eu-paris-1"
 }
 
+variable "aws_region" {
+  description = "The AWS region to deploy resources in"
+  type        = string
+  default     = "eu-west-3"
+}
+
+variable "aws_profile" {
+  type        = string
+  default     = ""
+  description = "AWS profile name as set in the shared credentials file"
+}
+
+variable "aws_role_arn" {
+  type        = string
+  default     = ""
+  description = "The AWS role to be assumed"
+}
+
+
 variable "oci_compartment_id" {
   description = "The OCID of the compartment"
   type        = string
@@ -96,13 +115,14 @@ variable "retention_rule_duration_time_unit" {
 variable "retention_rule_time_rule_locked" {
   type        = string
   description = "(Optional) (Updatable) The date and time when the retention rule is locked, in RFC 3339 format. Use 'no date' to indicate no lock."
-  default     = ""
+  default     = null
 
   validation {
-    condition = can(regex("^$|^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", var.retention_rule_time_rule_locked))
-    error_message = "The value must be empty or a valid RFC 3339 date and time string (e.g., '2025-05-04T12:34:56Z')."
+    condition = var.retention_rule_time_rule_locked == null || can(regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", var.retention_rule_time_rule_locked))
+    error_message = "The value must be null or a valid RFC 3339 date and time string (e.g., '2025-05-04T12:34:56Z')."
   }
 }
+
 variable "storage_tier" {
   type        = string
   description = "(Optional) The type of storage tier of this bucket. A bucket is set to 'Standard' tier by default, which means the bucket will be put in the standard storage tier. When 'Archive' tier type is set explicitly, the bucket is put in the Archive Storage tier. The 'storageTier' property is immutable after bucket is created."
@@ -118,11 +138,5 @@ variable "versioning" {
 variable "bucket_enabled" {
   type        = bool
   description = "Whether to create the OCI Object Storage bucket."
-  default     = true
-}
-
-variable "table_enabled" {
-  type        = bool
-  description = "Whether to create the OCI NoSQL table."
   default     = true
 }

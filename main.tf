@@ -2,9 +2,9 @@ locals {
   enabled = module.this.enabled
 
   bucket_enabled   = local.enabled && var.bucket_enabled
-  table_enabled    = local.enabled && var.table_enabled
+  dynamodb_enabled = local.enabled && var.dynamodb_enabled
 
-  table_name = local.table_enabled ? coalesce(var.table_name, module.oci_nosql_table_label.id) : ""
+  dynamodb_table_name = local.dynamodb_enabled ? coalesce(var.dynamodb_table_name, module.dynamodb_table_label.id) : ""
 
   terraform_backend_config_file = format(
     "%s/%s",
@@ -15,8 +15,12 @@ locals {
   terraform_backend_config_template_file = var.terraform_backend_config_template_file != "" ? var.terraform_backend_config_template_file : "${path.module}/templates/terraform.tf.tpl"
 
   terraform_backend_config_content = templatefile(local.terraform_backend_config_template_file, {
-    bucket = try(oci_objectstorage_bucket.default[0].name, "")
-    region = var.oci_region
+    bucket        = try(oci_objectstorage_bucket.default[0].name, "")
+    oci_region    = var.oci_region
+    aws_region    = var.oci_region
+    aws_role_arn  = var.aws_role_arn == null ? "" : var.aws_role_arn
+    aws_profile   = var.aws_profile == null ? "" : var.aws_profile
+
     key    = var.terraform_state_file == null ? "tf.tfstate" : var.terraform_state_file
     skip_region_validation      = true
     skip_credentials_validation = true
@@ -30,15 +34,12 @@ locals {
         var.oci_namespace,
         var.oci_region
       )   
-  }
+    }
+    dynamodb_table = try(aws_dynamodb_table.with_server_side_encryption[0].name, "")
 
-
-    table_name          = try(oci_nosql_table.default[0].name, "")
-    encrypt             = "true"
-    profile             = var.profile == null ? "" : var.profile
     terraform_version   = var.terraform_version == null ? "" : var.terraform_version
     terraform_state_file = var.terraform_state_file == null ? "" : var.terraform_state_file
-    namespace           = var.namespace == null ? "" : var.namespace
+    namespace           = var.oci_namespace == null ? "" : var.oci_namespace
     stage               = var.stage == null ? "" : var.stage
     environment         = var.environment == null ? "" : var.environment
     name                = var.name == null ? "" : var.name
@@ -59,15 +60,6 @@ module "bucket_label" {
   context = module.this.context
 }
 
-module "oci_nosql_table_label" {
-  source     = "cloudposse/label/null"
-  version    = "0.25.0"
-  attributes = []
-  context    = module.this.context
-  enabled    = local.table_enabled
-}
-
-
 data "oci_identity_region_subscriptions" "current" {
   tenancy_id = var.oci_tenancy_ocid
 }
@@ -75,35 +67,65 @@ data "oci_identity_region_subscriptions" "current" {
 resource "oci_objectstorage_bucket" "default" {
   count = local.bucket_enabled ? 1 : 0
 
-  namespace         = var.oci_namespace
-  name              = substr(local.bucket_name, 0, 63)
-  compartment_id    = var.compartment_id
-  storage_tier      = var.storage_tier
-  versioning        = var.versioning
-
-  freeform_tags = var.tags
-}
-
-resource "oci_nosql_table" "default" {
-  count                   = local.table_enabled ? 1 : 0
-
   # Required
-  compartment_id          = var.compartment_id
-  ddl_statement           = var.ddl_statement
-  name                    = local.table_name
+  compartment_id    = var.oci_compartment_id
+  name              = substr(local.bucket_name, 0, 63)
+  namespace         = var.oci_namespace
 
   # Optional
-  defined_tags            = var.defined_tags
-  freeform_tags           = var.freeform_tags
-  is_auto_reclaimable     = var.is_auto_reclaimable
-  table_limits {
-    # Required
-    max_read_units        = var.max_read_units
-    max_storage_in_gbs    = var.max_storage_in_gbs
-    max_write_units       = var.max_write_units
-    # Optional
-    capacity_mode         = var.capacity_mode
+  access_type = var.access_type
+  auto_tiering = var.auto_tiering
+  #defined_tags = {}
+  freeform_tags = {"atmos_name"= module.this.id}
+  kms_key_id = var.kms_master_key_id
+  metadata = var.metadata
+  object_events_enabled = var.object_events_enabled
+  storage_tier = var.storage_tier
+  #retention_rules {
+  #    display_name = var.retention_rule_display_name
+  #    duration {
+  #        #Required
+  #        time_amount = var.retention_rule_duration_time_amount
+  #        time_unit = var.retention_rule_duration_time_unit
+  #    }
+  #    time_rule_locked = var.retention_rule_time_rule_locked != null ? var.retention_rule_time_rule_locked : null
+  #}
+  versioning = var.versioning
+}
+
+module "dynamodb_table_label" {
+  source     = "cloudposse/label/null"
+  version    = "0.25.0"
+  attributes = ["lock"]
+  context    = module.this.context
+  enabled    = local.dynamodb_enabled
+}
+
+resource "aws_dynamodb_table" "with_server_side_encryption" {
+  count                       = local.dynamodb_enabled ? 1 : 0
+  name                        = local.dynamodb_table_name
+  billing_mode                = var.billing_mode
+  read_capacity               = var.billing_mode == "PROVISIONED" ? var.read_capacity : null
+  write_capacity              = var.billing_mode == "PROVISIONED" ? var.write_capacity : null
+  deletion_protection_enabled = var.deletion_protection_enabled
+
+  # https://www.terraform.io/docs/backends/types/s3.html#dynamodb_table
+  hash_key = "LockID"
+
+  server_side_encryption { #tfsec:ignore:aws-dynamodb-table-customer-key
+    enabled = true
   }
+
+  point_in_time_recovery {
+    enabled = var.enable_point_in_time_recovery
+  }
+
+  attribute {
+    name = "LockID"
+    type = "S"
+  }
+
+  tags = module.dynamodb_table_label.tags
 }
 
 resource "local_file" "terraform_backend_config" {

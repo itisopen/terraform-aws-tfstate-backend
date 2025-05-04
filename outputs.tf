@@ -18,12 +18,17 @@ output "bucket_compartment_id" {
   value       = oci_objectstorage_bucket.default[0].compartment_id
 }
 
-output "nosql_table_name" {
-  description = "The name of the OCI NoSQL table."
-  value       = oci_nosql_table.default[0].name
+output "dynamodb_table_name" {
+  value       = one(aws_dynamodb_table.with_server_side_encryption[*].name)
+  description = "DynamoDB table name"
 }
 
-output "nosql_table_compartment_id" {
-  description = "The compartment ID of the OCI NoSQL table."
-  value       = oci_nosql_table.default[0].compartment_id
+output "dynamodb_table_id" {
+  value       = one(aws_dynamodb_table.with_server_side_encryption[*].id)
+  description = "DynamoDB table ID"
+}
+
+output "dynamodb_table_arn" {
+  value       = one(aws_dynamodb_table.with_server_side_encryption[*].arn)
+  description = "DynamoDB table ARN"
 }

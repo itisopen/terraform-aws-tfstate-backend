@@ -2,9 +2,11 @@ terraform {
   required_version = ">= ${terraform_version}"
 
   backend "s3" {
-    bucket  = "${bucket}"
-    region  = "${region}"
-    key     = "${terraform_state_file}"
+    bucket       = "${bucket}"
+    oci_region   = "${oci_region}"
+    aws_region   = "${aws_region}"
+    aws_profile  = "${aws_profile}"
+    key          = "${terraform_state_file}"
     skip_region_validation      = "${skip_region_validation}"
     skip_credentials_validation = "${skip_credentials_validation}"
     skip_requesting_account_id  = "${skip_requesting_account_id}"
@@ -14,9 +16,16 @@ terraform {
     endpoints = {
       s3 = "https://<namespace>.compat.objectstorage.<region>.oraclecloud.com"
     }
-    %{~ if table_name != "" ~}
+    %{~ if aws_role_arn != "" ~}
 
-    table_name = "${table_name}"
+    assume_role {
+      aws_role_arn = "${aws_role_arn}"
+    }
+    %{~ endif ~}
+
+    %{~ if dynamodb_table != "" ~}
+
+    dynamodb_table = "${dynamodb_table}"
     %{~ endif ~}
   }
 }

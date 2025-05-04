@@ -44,16 +44,13 @@ badges:
 
 # List any related terraform modules that this module may be used with or that this module depends on.
 related:
-  - name: "terraform-oci-nosql"
-    description: "Terraform module that implements OCI NoSQL Table with support for AutoScaling"
-    url: "https://github.com/cloudposse/terraform-oci-nosql"
   - name: "terraform-oci-object-storage"
     description: "Terraform module to provision OCI Object Storage bucket"
     url: "https://github.com/cloudposse/terraform-oci-object-storage"
 
 # Short description of this project
 description: |-
-  This module provisions resources on Oracle Cloud Infrastructure (OCI) to support Terraform state storage and locking. It replaces AWS S3 and DynamoDB with OCI Object Storage and NoSQL Table.
+  This module provisions an object storage bucket on Oracle Cloud Infrastructure (OCI) and an Amazon DynamoDB to support Terraform state storage and locking. Amazon DynamoDB is used because there is an alway free tier available while the Oracle NoSQL Always Free Tier is not available in regions other than US West (Phoenix) (us-phoenix-1).
 
 inputs:
   - name: oci_namespace
@@ -66,10 +63,6 @@ inputs:
     required: true
   - name: bucket_enabled
     description: Whether to create the OCI Object Storage bucket.
-    type: bool
-    default: true
-  - name: table_enabled
-    description: Whether to create the OCI NoSQL table.
     type: bool
     default: true
   - name: storage_tier
@@ -88,18 +81,6 @@ inputs:
     description: Whether the bucket can be destroyed even if it contains objects.
     type: bool
     default: false
-  - name: max_read_units
-    description: Maximum read units for the NoSQL table.
-    type: number
-    default: 10
-  - name: max_write_units
-    description: Maximum write units for the NoSQL table.
-    type: number
-    default: 10
-  - name: max_storage_in_gbs
-    description: Maximum storage in GBs for the NoSQL table.
-    type: number
-    default: 10
   - name: tags
     description: A map of tags to assign to resources.
     type: map(string)
@@ -112,10 +93,6 @@ outputs:
     description: The namespace of the OCI Object Storage bucket.
   - name: bucket_compartment_id
     description: The compartment ID of the OCI Object Storage bucket.
-  - name: nosql_table_name
-    description: The name of the OCI NoSQL table.
-  - name: nosql_table_compartment_id
-    description: The compartment ID of the OCI NoSQL table.
 
 include:
   - "docs/targets.md"

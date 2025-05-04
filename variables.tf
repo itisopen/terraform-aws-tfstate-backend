@@ -1,9 +1,3 @@
-variable "oci_namespace" {
-  type        = string
-  description = "The namespace of the OCI Object Storage bucket."
-  default     = ""
-}
-
 variable "terraform_backend_config_file_name" {
   type        = string
   description = "Name of the Terraform backend config file to generate."
@@ -45,12 +39,6 @@ variable "s3_bucket_name" {
   }
 }
 
-variable "profile" {
-  type        = string
-  description = "The name of the profile to use for authentication."
-  default     = null
-}
-
 variable "ddl_statement" {
   type        = string
   description = "(Required) (Updatable) Complete CREATE TABLE DDL statement. When update ddl_statement, it should be ALTER TABLE DDL statement."
@@ -87,11 +75,6 @@ variable "kms_master_key_id" {
     EOT
 }
 
-variable "compartment_id" {
-  type        = string
-  description = "The OCID of the compartment where resources will be created."
-}
-
 variable "storage_tier" {
   type        = string
   description = "The storage tier of the bucket. Valid values are 'Standard', 'InfrequentAccess', or 'Archive'."
@@ -116,54 +99,6 @@ variable "policy_statements" {
   default     = []
 }
 
-variable "max_read_units" {
-  type        = number
-  description = "Maximum read units for the NoSQL table."
-  default     = 0
-}
-
-variable "max_write_units" {
-  type        = number
-  description = "Maximum write units for the NoSQL table."
-  default     = 0
-}
-
-variable "max_storage_in_gbs" {
-  type        = number
-  description = "Maximum storage in GBs for the NoSQL table."
-  default     = 1
-}
-
-variable "table_enabled" {
-  type        = bool
-  description = "Whether to create the OCI NoSQL table."
-  default     = true
-}
-
-variable "table_name" {
-  type        = string
-  description = "Override the name of the NoSQL table."
-  default     = null
-}
-
-
-variable "oci_tenancy_ocid" {
-  type        = string
-  description = "The OCID of the tenancy."
-}
-
-variable "defined_tags" {
-  type        = map(string)
-  description = "(Optional) (Updatable) Defined tags for this resource. Each key is predefined and scoped to a namespace. Example: {'foo-namespace': {'bar-key': 'value'}}"
-  default     = {}
-}
-
-variable "freeform_tags" {
-  type        = map(string)
-  description = "(Optional) (Updatable) Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only. Example: {'bar-key': 'value'}"
-  default     = {}
-}
-
 variable "is_auto_reclaimable" {
   type        = bool
   description = " (Optional) True if table can be reclaimed after an idle period."
@@ -176,8 +111,162 @@ variable "capacity_mode" {
   default     = "ON_DEMAND"
 }
 
+variable "dynamodb_enabled" {
+  type        = bool
+  default     = true
+  description = "Whether to create the DynamoDB table."
+}
+
+variable "dynamodb_table_name" {
+  type        = string
+  default     = null
+  description = "Override the name of the DynamoDB table which defaults to using `module.dynamodb_table_label.id`"
+}
+
+variable "billing_mode" {
+  type        = string
+  description = "DynamoDB billing mode"
+  default     = "PAY_PER_REQUEST"
+}
+
+variable "read_capacity" {
+  type        = number
+  description = "DynamoDB read capacity units when using provisioned mode"
+  default     = 5
+}
+
+variable "write_capacity" {
+  type        = number
+  description = "DynamoDB write capacity units when using provisioned mode"
+  default     = 5
+}
+
+variable "deletion_protection_enabled" {
+  type        = bool
+  description = "A boolean that enables deletion protection for DynamoDB table"
+  default     = false
+}
+
+variable "enable_point_in_time_recovery" {
+  type        = bool
+  description = "Enable DynamoDB point-in-time recovery"
+  default     = true
+}
+
+variable "oci_namespace" {
+  description = "The name of the OCI namespace"
+  type        = string
+  default     = ""
+}
+
+variable "oci_tenancy_ocid" {
+  description = "The OCID of the tenancy"
+  type        = string
+}
+
+variable "oci_user_ocid" {
+  description = "The OCID of the user"
+  type        = string
+}
+
+variable "oci_fingerprint" {
+  description = "The fingerprint for the API key"
+  type        = string
+}
+
+variable "oci_private_key_path" {
+  description = "The path to the private key file"
+  type        = string
+}
+
 variable "oci_region" {
   description = "The OCI region to deploy resources in"
   type        = string
   default     = "eu-paris-1"
+}
+
+variable "aws_region" {
+  description = "The AWS region to deploy resources in"
+  type        = string
+  default     = "eu-west-3"
+}
+
+variable "aws_profile" {
+  type        = string
+  default     = ""
+  description = "AWS profile name as set in the shared credentials file"
+}
+
+variable "aws_role_arn" {
+  type        = string
+  default     = ""
+  description = "The AWS role to be assumed"
+}
+
+variable "oci_compartment_id" {
+  description = "The OCID of the compartment"
+  type        = string
+}
+
+variable "access_type" {
+  type        = string
+  description = "(Optional) (Updatable) The type of public access enabled on this bucket. A bucket is set to NoPublicAccess by default, which only allows an authenticated caller to access the bucket and its contents. When ObjectRead is enabled on the bucket, public access is allowed for the GetObject, HeadObject, and ListObjects operations. When ObjectReadWithoutList is enabled on the bucket, public access is allowed for the GetObject and HeadObject operations."
+  default     = "NoPublicAccess"
+}
+
+variable "auto_tiering" {
+  type        = string
+  description = "(Optional) (Updatable) Set the auto tiering status on the bucket. By default, a bucket is created with auto tiering Disabled. Use this option to enable auto tiering during bucket creation. Objects in a bucket with auto tiering set to InfrequentAccess are transitioned automatically between the 'Standard' and 'InfrequentAccess' tiers based on the access pattern of the objects."
+  default     = "Disabled"
+}
+
+variable "defined_tags" {
+  type        = map(string)
+  description = "(Optioregionnal) (Updatable) Defined tags for this resource. Each key is predefined and scoped to a namespace. For more information, see Resource Tags. Example: {'Operations.CostCenter': '42'}"
+  default     = {}
+}
+
+variable "freeform_tags" {
+  type        = map(string)
+  description = "(Optional) (Updatable) Free-form tags for this resource. Each tag is a simple key-value pair with no predefined name, type, or namespace. For more information, see Resource Tags. Example: {'Department': 'Finance'}"
+  default     = {}  
+}
+
+variable "metadata" {
+  type        = map(string)
+  description = "(Optional) (Updatable) Arbitrary string, up to 4KB, of keys and values for user-defined metadata."
+  default     = {}
+}
+
+variable "object_events_enabled" {
+  type        = bool
+  description = "(Optional) (Updatable) Whether or not events are emitted for object state changes in this bucket. By default, objectEventsEnabled is set to false. Set objectEventsEnabled to true to emit events for object state changes. For more information about events, see Overview of Events."
+  default     = false
+}
+
+variable "retention_rule_display_name" {
+  type        = string
+  description = "(Optional) (Updatable) The display name of the retention rule. The name must be unique within the bucket and cannot be changed after the rule is created."
+  default     = "Retention Rule"
+}
+
+variable "retention_rule_duration_time_amount" {
+  type        = number
+  description = "(Optional) (Updatable) The amount of time for the retention rule. The value must be a positive integer."
+  default     = 1
+}
+variable "retention_rule_duration_time_unit" {
+  type        = string
+  description = "(Optional) (Updatable) The unit of time for the retention rule. Allowed values are: Days, Months, Years."
+  default     = "Days"
+}
+variable "retention_rule_time_rule_locked" {
+  type        = string
+  description = "(Optional) (Updatable) The date and time when the retention rule is locked, in RFC 3339 format. Use 'no date' to indicate no lock."
+  default     = null
+
+  validation {
+    condition = var.retention_rule_time_rule_locked == null || can(regex("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})$", var.retention_rule_time_rule_locked))
+    error_message = "The value must be null or a valid RFC 3339 date and time string (e.g., '2025-05-04T12:34:56Z')."
+  }
 }
