@@ -1,140 +1,37 @@
-variable "arn_format" {
+variable "oci_namespace" {
   type        = string
-  description = "ARN format to be used. May be changed to support deployment in GovCloud/China regions."
-  default     = "arn:aws"
-}
-
-variable "acl" {
-  type        = string
-  description = "The canned ACL to apply to the S3 bucket"
-  default     = "private"
-}
-
-variable "billing_mode" {
-  type        = string
-  description = "DynamoDB billing mode"
-  default     = "PAY_PER_REQUEST"
-}
-
-variable "read_capacity" {
-  type        = number
-  description = "DynamoDB read capacity units when using provisioned mode"
-  default     = 5
-}
-
-variable "write_capacity" {
-  type        = number
-  description = "DynamoDB write capacity units when using provisioned mode"
-  default     = 5
-}
-
-variable "force_destroy" {
-  type        = bool
-  description = "A boolean that indicates the S3 bucket can be destroyed even if it contains objects. These objects are not recoverable"
-  default     = false
-}
-
-variable "deletion_protection_enabled" {
-  type        = bool
-  description = "A boolean that enables deletion protection for DynamoDB table"
-  default     = false
-}
-
-
-variable "mfa_delete" {
-  type        = bool
-  description = "A boolean that indicates that versions of S3 objects can only be deleted with MFA. ( Terraform cannot apply changes of this value; https://github.com/terraform-providers/terraform-provider-aws/issues/629 )"
-  default     = false
-}
-
-variable "enable_point_in_time_recovery" {
-  type        = bool
-  description = "Enable DynamoDB point-in-time recovery"
-  default     = true
-}
-
-variable "enable_public_access_block" {
-  type        = bool
-  description = "Enable Bucket Public Access Block"
-  default     = true
-}
-
-variable "bucket_ownership_enforced_enabled" {
-  type        = bool
-  description = "Set bucket object ownership to \"BucketOwnerEnforced\". Disables ACLs."
-  default     = true
-}
-
-variable "block_public_acls" {
-  type        = bool
-  description = "Whether Amazon S3 should block public ACLs for this bucket"
-  default     = true
-}
-
-variable "ignore_public_acls" {
-  type        = bool
-  description = "Whether Amazon S3 should ignore public ACLs for this bucket"
-  default     = true
-}
-
-variable "block_public_policy" {
-  type        = bool
-  description = "Whether Amazon S3 should block public bucket policies for this bucket"
-  default     = true
-}
-
-variable "restrict_public_buckets" {
-  type        = bool
-  description = "Whether Amazon S3 should restrict public bucket policies for this bucket"
-  default     = true
-}
-
-variable "prevent_unencrypted_uploads" {
-  type        = bool
-  default     = true
-  description = "Prevent uploads of unencrypted objects to S3"
-}
-
-variable "profile" {
-  type        = string
+  description = "The namespace of the OCI Object Storage bucket."
   default     = ""
-  description = "AWS profile name as set in the shared credentials file"
-}
-
-variable "role_arn" {
-  type        = string
-  default     = ""
-  description = "The role to be assumed"
 }
 
 variable "terraform_backend_config_file_name" {
   type        = string
+  description = "Name of the Terraform backend config file to generate."
   default     = "terraform.tf"
-  description = "(Deprecated) Name of terraform backend config file to generate"
 }
 
 variable "terraform_backend_config_file_path" {
   type        = string
+  description = "Directory for the Terraform backend config file."
   default     = ""
-  description = "(Deprecated) Directory for the terraform backend config file, usually `.`. The default is to create no file."
 }
 
 variable "terraform_backend_config_template_file" {
   type        = string
+  description = "The path to the template used to generate the config file."
   default     = ""
-  description = "(Deprecated) The path to the template used to generate the config file"
 }
 
 variable "terraform_version" {
   type        = string
+  description = "The minimum required Terraform version."
   default     = "1.0.0"
-  description = "The minimum required terraform version"
 }
 
 variable "terraform_state_file" {
   type        = string
+  description = "The path to the state file inside the bucket."
   default     = "terraform.tfstate"
-  description = "The path to the state file inside the bucket"
 }
 
 variable "s3_bucket_name" {
@@ -148,16 +45,16 @@ variable "s3_bucket_name" {
   }
 }
 
-variable "s3_replication_enabled" {
-  type        = bool
-  default     = false
-  description = "Set this to true and specify `s3_replica_bucket_arn` to enable replication"
+variable "profile" {
+  type        = string
+  description = "The name of the profile to use for authentication."
+  default     = null
 }
 
-variable "s3_replica_bucket_arn" {
+variable "ddl_statement" {
   type        = string
-  default     = ""
-  description = "The ARN of the S3 replica bucket (destination)"
+  description = "(Required) (Updatable) Complete CREATE TABLE DDL statement. When update ddl_statement, it should be ALTER TABLE DDL statement."
+  default     = "CREATE TABLE IF NOT EXISTS dev (id STRING, data JSON, PRIMARY KEY (id))"
 }
 
 variable "logging" {
@@ -175,52 +72,112 @@ variable "logging" {
 
 variable "bucket_enabled" {
   type        = bool
+  description = "Whether to create the OCI Object Storage bucket."
   default     = true
-  description = "Whether to create the S3 bucket."
 }
 
-variable "dynamodb_enabled" {
-  type        = bool
-  default     = true
-  description = "Whether to create the DynamoDB table."
-}
-
-variable "dynamodb_table_name" {
-  type        = string
-  default     = null
-  description = "Override the name of the DynamoDB table which defaults to using `module.dynamodb_table_label.id`"
-}
-
-variable "permissions_boundary" {
-  type        = string
-  default     = ""
-  description = "ARN of the policy that is used to set the permissions boundary for the IAM replication role"
-}
-
-variable "source_policy_documents" {
-  type        = list(string)
-  default     = []
-  description = <<-EOT
-    List of IAM policy documents (in JSON format) that are merged together into the generated S3 bucket policy.
-    Statements must have unique SIDs.
-    Statement having SIDs that match policy SIDs generated by this module will override them.
-    EOT
-}
-
-variable "sse_encryption" {
-  type        = string
-  default     = "AES256"
-  description = <<-EOT
-    The server-side encryption algorithm to use.
-    Valid values are `AES256`, `aws:kms`, and `aws:kms:dsse`.
-    EOT
-}
 
 variable "kms_master_key_id" {
   type        = string
   default     = null
   description = <<-EOT
-    AWS KMS master key ID used for the SSE-KMS encryption.
-    This can only be used when you set the value of sse_algorithm as aws:kms.
+    (Optional) (Updatable) The OCID of a master encryption key used 
+    to call the Key Management service to generate a data encryption 
+    key or to encrypt or decrypt a data encryption key.
     EOT
+}
+
+variable "compartment_id" {
+  type        = string
+  description = "The OCID of the compartment where resources will be created."
+}
+
+variable "storage_tier" {
+  type        = string
+  description = "The storage tier of the bucket. Valid values are 'Standard', 'InfrequentAccess', or 'Archive'."
+  default     = "Standard"
+}
+
+variable "public_access_type" {
+  type        = string
+  description = "The type of public access for the bucket. Valid values are 'NoPublicAccess', 'ObjectRead', or 'ObjectReadWithoutList'."
+  default     = "NoPublicAccess"
+}
+
+variable "versioning" {
+  type        = string
+  description = "The versioning status of the bucket. Valid values are 'Enabled' or 'Suspended'."
+  default     = "Enabled"
+}
+
+variable "policy_statements" {
+  type        = list(string)
+  description = "List of policy statements to apply to the bucket."
+  default     = []
+}
+
+variable "max_read_units" {
+  type        = number
+  description = "Maximum read units for the NoSQL table."
+  default     = 0
+}
+
+variable "max_write_units" {
+  type        = number
+  description = "Maximum write units for the NoSQL table."
+  default     = 0
+}
+
+variable "max_storage_in_gbs" {
+  type        = number
+  description = "Maximum storage in GBs for the NoSQL table."
+  default     = 1
+}
+
+variable "table_enabled" {
+  type        = bool
+  description = "Whether to create the OCI NoSQL table."
+  default     = true
+}
+
+variable "table_name" {
+  type        = string
+  description = "Override the name of the NoSQL table."
+  default     = null
+}
+
+
+variable "oci_tenancy_ocid" {
+  type        = string
+  description = "The OCID of the tenancy."
+}
+
+variable "defined_tags" {
+  type        = map(string)
+  description = "(Optional) (Updatable) Defined tags for this resource. Each key is predefined and scoped to a namespace. Example: {'foo-namespace': {'bar-key': 'value'}}"
+  default     = {}
+}
+
+variable "freeform_tags" {
+  type        = map(string)
+  description = "(Optional) (Updatable) Simple key-value pair that is applied without any predefined name, type or scope. Exists for cross-compatibility only. Example: {'bar-key': 'value'}"
+  default     = {}
+}
+
+variable "is_auto_reclaimable" {
+  type        = bool
+  description = " (Optional) True if table can be reclaimed after an idle period."
+  default     = false
+}
+
+variable "capacity_mode" {
+  type        = string
+  description = "Optional) (Updatable) The capacity mode of the table. If capacityMode = ON_DEMAND, maxReadUnits and maxWriteUnits are not used, and both will have the value of zero."
+  default     = "ON_DEMAND"
+}
+
+variable "oci_region" {
+  description = "The OCI region to deploy resources in"
+  type        = string
+  default     = "eu-paris-1"
 }

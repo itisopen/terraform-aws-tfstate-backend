@@ -27,22 +27,7 @@
 
 -->
 
-Terraform module to provision an S3 bucket to store `terraform.tfstate` file and a DynamoDB table to lock the state file
-to prevent concurrent modifications and state corruption.
-
-The module supports the following:
-
-1. Forced server-side encryption at rest for the S3 bucket
-2. S3 bucket versioning to allow for Terraform state recovery in the case of accidental deletions and human errors
-3. State locking and consistency checking via DynamoDB table to prevent concurrent operations
-4. DynamoDB server-side encryption
-
-https://www.terraform.io/docs/backends/types/s3.html
-
-
-__NOTE:__ The operators of the module (IAM Users) must have permissions to create S3 buckets and DynamoDB tables when performing `terraform plan` and `terraform apply`
-
-__NOTE:__ This module cannot be used to apply changes to the `mfa_delete` feature of the bucket. Changes regarding mfa_delete can only be made manually using the root credentials with MFA of the AWS Account where the bucket resides. Please see: https://github.com/terraform-providers/terraform-provider-aws/issues/629
+This module provisions resources on Oracle Cloud Infrastructure (OCI) to support Terraform state storage and locking. It replaces AWS S3 and DynamoDB with OCI Object Storage and NoSQL Table.
 
 
 > [!TIP]
@@ -57,134 +42,6 @@ __NOTE:__ This module cannot be used to apply changes to the `mfa_delete` featur
 > </detalis>
 
 
-
-
-
-## Usage
-
-
-### Create
-
-Follow this procedure just once to create your deployment.
-
-1. Add the `terraform_state_backend` module to your `main.tf` file. The
-   comment will help you remember to follow this procedure in the future:
-   ```hcl
-   # You cannot create a new backend by simply defining this and then
-   # immediately proceeding to "terraform apply". The S3 backend must
-   # be bootstrapped according to the simple yet essential procedure in
-   # https://github.com/cloudposse/terraform-aws-tfstate-backend#usage
-   module "terraform_state_backend" {
-     source = "cloudposse/tfstate-backend/aws"
-     # Cloud Posse recommends pinning every module to a specific version
-     # version     = "x.x.x"
-     namespace  = "eg"
-     stage      = "test"
-     name       = "terraform"
-     attributes = ["state"]
-
-     terraform_backend_config_file_path = "."
-     terraform_backend_config_file_name = "backend.tf"
-     force_destroy                      = false
-   }
-
-   # Your Terraform configuration
-   module "another_module" {
-     source = "....."
-   }
-   ```
-   Module inputs `terraform_backend_config_file_path` and
-   `terraform_backend_config_file_name` control the name of the backend
-   definition file. Note that when `terraform_backend_config_file_path` is
-   empty (the default), no file is created.
-
-1. `terraform init`. This downloads Terraform modules and providers.
-
-1. `terraform apply -auto-approve`. This creates the state bucket and DynamoDB locking
-   table, along with anything else you have defined in your `*.tf` file(s). At
-   this point, the Terraform state is still stored locally.
-
-   Module `terraform_state_backend` also creates a new `backend.tf` file
-   that defines the S3 state backend. For example:
-   ```hcl
-   backend "s3" {
-     region         = "us-east-1"
-     bucket         = "< the name of the S3 state bucket >"
-     key            = "terraform.tfstate"
-     dynamodb_table = "< the name of the DynamoDB locking table >"
-     profile        = ""
-     role_arn       = ""
-     encrypt        = true
-   }
-   ```
-
-   Henceforth, Terraform will also read this newly-created backend definition
-   file.
-
-1. `terraform init -force-copy`. Terraform detects that you want to move your
-   Terraform state to the S3 backend, and it does so per `-auto-approve`. Now the
-   state is stored in the S3 bucket, and the DynamoDB table will be used to lock
-   the state to prevent concurrent modification.
-
-This concludes the one-time preparation. Now you can extend and modify your
-Terraform configuration as usual.
-
-### Destroy
-
-Follow this procedure to delete your deployment.
-
-1. In `main.tf`, change the `terraform_state_backend` module arguments as
-   follows:
-   ```hcl
-    module "terraform_state_backend" {
-      # ...
-      terraform_backend_config_file_path = ""
-      force_destroy                      = true
-    }
-    ```
-1. `terraform apply -target module.terraform_state_backend -auto-approve`.
-   This implements the above modifications by deleting the `backend.tf` file
-   and enabling deletion of the S3 state bucket.
-1. `terraform init -force-copy`. Terraform detects that you want to move your
-   Terraform state from the S3 backend to local files, and it does so per
-   `-auto-approve`. Now the state is once again stored locally and the S3
-   state bucket can be safely deleted.
-1. `terraform destroy`. This deletes all resources in your deployment.
-1. Examine local state file `terraform.tfstate` to verify that it contains
-   no resources.
-
-<br/>
-
-![s3-bucket-with-terraform-state](images/s3-bucket-with-terraform-state.png)
-
-### Bucket Replication (Disaster Recovery)
-
-To enable S3 bucket replication in this module, set `s3_replication_enabled` to `true` and populate `s3_replica_bucket_arn` with the ARN of an existing bucket.
-
-```hcl
-module "terraform_state_backend" {
-  source = "cloudposse/tfstate-backend/aws"
-  # Cloud Posse recommends pinning every module to a specific version
-  # version     = "x.x.x"
-  namespace  = "eg"
-  stage      = "test"
-  name       = "terraform"
-  attributes = ["state"]
-
-  terraform_backend_config_file_path = "."
-  terraform_backend_config_file_name = "backend.tf"
-  force_destroy                      = false
-
-  s3_replication_enabled = true
-  s3_replica_bucket_arn  = "arn:aws:s3:::eg-test-terraform-tfstate-replica"
-}
-```
-
-> [!IMPORTANT]
-> In Cloud Posse's examples, we avoid pinning modules to specific versions to prevent discrepancies between the documentation
-> and the latest released versions. However, for your own projects, we strongly advise pinning each module to the exact version
-> you're using. This practice ensures the stability of your infrastructure. Additionally, we recommend implementing a systematic
-> approach for updating versions to avoid unexpected changes.
 
 
 
@@ -221,14 +78,13 @@ Available targets:
 |------|---------|
 | <a name="provider_aws"></a> [aws](#provider\_aws) | >= 4.9.0 |
 | <a name="provider_local"></a> [local](#provider\_local) | >= 2.0 |
-| <a name="provider_time"></a> [time](#provider\_time) | >= 0.7.1 |
+| <a name="provider_oci"></a> [oci](#provider\_oci) | n/a |
 
 ## Modules
 
 | Name | Source | Version |
 |------|--------|---------|
 | <a name="module_bucket_label"></a> [bucket\_label](#module\_bucket\_label) | cloudposse/label/null | 0.25.0 |
-| <a name="module_dynamodb_table_label"></a> [dynamodb\_table\_label](#module\_dynamodb\_table\_label) | cloudposse/label/null | 0.25.0 |
 | <a name="module_replication_label"></a> [replication\_label](#module\_replication\_label) | cloudposse/label/null | 0.25.0 |
 | <a name="module_this"></a> [this](#module\_this) | cloudposse/label/null | 0.25.0 |
 
@@ -236,26 +92,17 @@ Available targets:
 
 | Name | Type |
 |------|------|
-| [aws_dynamodb_table.with_server_side_encryption](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/dynamodb_table) | resource |
 | [aws_iam_policy.replication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_policy) | resource |
 | [aws_iam_role.replication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role) | resource |
 | [aws_iam_role_policy_attachment.replication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment) | resource |
-| [aws_s3_bucket.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket) | resource |
-| [aws_s3_bucket_acl.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_acl) | resource |
-| [aws_s3_bucket_logging.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_logging) | resource |
-| [aws_s3_bucket_ownership_controls.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_ownership_controls) | resource |
-| [aws_s3_bucket_policy.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_policy) | resource |
-| [aws_s3_bucket_public_access_block.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_public_access_block) | resource |
 | [aws_s3_bucket_replication_configuration.replication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_replication_configuration) | resource |
-| [aws_s3_bucket_server_side_encryption_configuration.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_server_side_encryption_configuration) | resource |
-| [aws_s3_bucket_versioning.default](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket_versioning) | resource |
 | [local_file.terraform_backend_config](https://registry.terraform.io/providers/hashicorp/local/latest/docs/resources/file) | resource |
-| [time_sleep.wait_for_aws_s3_bucket_settings](https://registry.terraform.io/providers/hashicorp/time/latest/docs/resources/sleep) | resource |
-| [aws_iam_policy_document.aggregated_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
-| [aws_iam_policy_document.bucket_policy](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
+| [oci_nosql_table.default](https://registry.terraform.io/providers/hashicorp/oci/latest/docs/resources/nosql_table) | resource |
+| [oci_objectstorage_bucket.default](https://registry.terraform.io/providers/hashicorp/oci/latest/docs/resources/objectstorage_bucket) | resource |
+| [oci_objectstorage_bucket_policy.default](https://registry.terraform.io/providers/hashicorp/oci/latest/docs/resources/objectstorage_bucket_policy) | resource |
 | [aws_iam_policy_document.replication](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
 | [aws_iam_policy_document.replication_sts](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/iam_policy_document) | data source |
-| [aws_region.current](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/data-sources/region) | data source |
+| [oci_identity_region_subscriptions.current](https://registry.terraform.io/providers/hashicorp/oci/latest/docs/data-sources/identity_region_subscriptions) | data source |
 
 ## Inputs
 
@@ -268,8 +115,9 @@ Available targets:
 | <a name="input_billing_mode"></a> [billing\_mode](#input\_billing\_mode) | DynamoDB billing mode | `string` | `"PAY_PER_REQUEST"` | no |
 | <a name="input_block_public_acls"></a> [block\_public\_acls](#input\_block\_public\_acls) | Whether Amazon S3 should block public ACLs for this bucket | `bool` | `true` | no |
 | <a name="input_block_public_policy"></a> [block\_public\_policy](#input\_block\_public\_policy) | Whether Amazon S3 should block public bucket policies for this bucket | `bool` | `true` | no |
-| <a name="input_bucket_enabled"></a> [bucket\_enabled](#input\_bucket\_enabled) | Whether to create the S3 bucket. | `bool` | `true` | no |
+| <a name="input_bucket_enabled"></a> [bucket\_enabled](#input\_bucket\_enabled) | Whether to create the OCI Object Storage bucket. | `bool` | `true` | no |
 | <a name="input_bucket_ownership_enforced_enabled"></a> [bucket\_ownership\_enforced\_enabled](#input\_bucket\_ownership\_enforced\_enabled) | Set bucket object ownership to "BucketOwnerEnforced". Disables ACLs. | `bool` | `true` | no |
+| <a name="input_compartment_id"></a> [compartment\_id](#input\_compartment\_id) | The OCID of the compartment where resources will be created. | `string` | n/a | yes |
 | <a name="input_context"></a> [context](#input\_context) | Single object for setting entire context at once.<br/>See description of individual variables for details.<br/>Leave string and numeric variables as `null` to use default value.<br/>Individual variable settings (non-null) override settings in context object,<br/>except for attributes, tags, and additional\_tag\_map, which are merged. | `any` | <pre>{<br/>  "additional_tag_map": {},<br/>  "attributes": [],<br/>  "delimiter": null,<br/>  "descriptor_formats": {},<br/>  "enabled": true,<br/>  "environment": null,<br/>  "id_length_limit": null,<br/>  "label_key_case": null,<br/>  "label_order": [],<br/>  "label_value_case": null,<br/>  "labels_as_tags": [<br/>    "unset"<br/>  ],<br/>  "name": null,<br/>  "namespace": null,<br/>  "regex_replace_chars": null,<br/>  "stage": null,<br/>  "tags": {},<br/>  "tenant": null<br/>}</pre> | no |
 | <a name="input_deletion_protection_enabled"></a> [deletion\_protection\_enabled](#input\_deletion\_protection\_enabled) | A boolean that enables deletion protection for DynamoDB table | `bool` | `false` | no |
 | <a name="input_delimiter"></a> [delimiter](#input\_delimiter) | Delimiter to be used between ID elements.<br/>Defaults to `-` (hyphen). Set to `""` to use no delimiter at all. | `string` | `null` | no |
@@ -279,8 +127,8 @@ Available targets:
 | <a name="input_enable_point_in_time_recovery"></a> [enable\_point\_in\_time\_recovery](#input\_enable\_point\_in\_time\_recovery) | Enable DynamoDB point-in-time recovery | `bool` | `true` | no |
 | <a name="input_enable_public_access_block"></a> [enable\_public\_access\_block](#input\_enable\_public\_access\_block) | Enable Bucket Public Access Block | `bool` | `true` | no |
 | <a name="input_enabled"></a> [enabled](#input\_enabled) | Set to false to prevent the module from creating any resources | `bool` | `null` | no |
-| <a name="input_environment"></a> [environment](#input\_environment) | ID element. Usually used for region e.g. 'uw2', 'us-west-2', OR role 'prod', 'staging', 'dev', 'UAT' | `string` | `null` | no |
-| <a name="input_force_destroy"></a> [force\_destroy](#input\_force\_destroy) | A boolean that indicates the S3 bucket can be destroyed even if it contains objects. These objects are not recoverable | `bool` | `false` | no |
+| <a name="input_environment"></a> [environment](#input\_environment) | Environment for resource naming. | `string` | `""` | no |
+| <a name="input_force_destroy"></a> [force\_destroy](#input\_force\_destroy) | A boolean that indicates the bucket can be destroyed even if it contains objects. | `bool` | `false` | no |
 | <a name="input_id_length_limit"></a> [id\_length\_limit](#input\_id\_length\_limit) | Limit `id` to this many characters (minimum 6).<br/>Set to `0` for unlimited length.<br/>Set to `null` for keep the existing setting, which defaults to `0`.<br/>Does not affect `id_full`. | `number` | `null` | no |
 | <a name="input_ignore_public_acls"></a> [ignore\_public\_acls](#input\_ignore\_public\_acls) | Whether Amazon S3 should ignore public ACLs for this bucket | `bool` | `true` | no |
 | <a name="input_kms_master_key_id"></a> [kms\_master\_key\_id](#input\_kms\_master\_key\_id) | AWS KMS master key ID used for the SSE-KMS encryption.<br/>This can only be used when you set the value of sse\_algorithm as aws:kms. | `string` | `null` | no |
@@ -289,12 +137,18 @@ Available targets:
 | <a name="input_label_value_case"></a> [label\_value\_case](#input\_label\_value\_case) | Controls the letter case of ID elements (labels) as included in `id`,<br/>set as tag values, and output by this module individually.<br/>Does not affect values of tags passed in via the `tags` input.<br/>Possible values: `lower`, `title`, `upper` and `none` (no transformation).<br/>Set this to `title` and set `delimiter` to `""` to yield Pascal Case IDs.<br/>Default value: `lower`. | `string` | `null` | no |
 | <a name="input_labels_as_tags"></a> [labels\_as\_tags](#input\_labels\_as\_tags) | Set of labels (ID elements) to include as tags in the `tags` output.<br/>Default is to include all labels.<br/>Tags with empty values will not be included in the `tags` output.<br/>Set to `[]` to suppress all generated tags.<br/>**Notes:**<br/>  The value of the `name` tag, if included, will be the `id`, not the `name`.<br/>  Unlike other `null-label` inputs, the initial setting of `labels_as_tags` cannot be<br/>  changed in later chained modules. Attempts to change it will be silently ignored. | `set(string)` | <pre>[<br/>  "default"<br/>]</pre> | no |
 | <a name="input_logging"></a> [logging](#input\_logging) | Destination (S3 bucket name and prefix) for S3 Server Access Logs for the S3 bucket. | <pre>list(object({<br/>    target_bucket = string<br/>    target_prefix = string<br/>  }))</pre> | `[]` | no |
+| <a name="input_max_read_units"></a> [max\_read\_units](#input\_max\_read\_units) | Maximum read units for the NoSQL table. | `number` | `10` | no |
+| <a name="input_max_storage_in_gbs"></a> [max\_storage\_in\_gbs](#input\_max\_storage\_in\_gbs) | Maximum storage in GBs for the NoSQL table. | `number` | `10` | no |
+| <a name="input_max_write_units"></a> [max\_write\_units](#input\_max\_write\_units) | Maximum write units for the NoSQL table. | `number` | `10` | no |
 | <a name="input_mfa_delete"></a> [mfa\_delete](#input\_mfa\_delete) | A boolean that indicates that versions of S3 objects can only be deleted with MFA. ( Terraform cannot apply changes of this value; https://github.com/terraform-providers/terraform-provider-aws/issues/629 ) | `bool` | `false` | no |
-| <a name="input_name"></a> [name](#input\_name) | ID element. Usually the component or solution name, e.g. 'app' or 'jenkins'.<br/>This is the only ID element not also included as a `tag`.<br/>The "name" tag is set to the full `id` string. There is no tag with the value of the `name` input. | `string` | `null` | no |
-| <a name="input_namespace"></a> [namespace](#input\_namespace) | ID element. Usually an abbreviation of your organization name, e.g. 'eg' or 'cp', to help ensure generated IDs are globally unique | `string` | `null` | no |
+| <a name="input_name"></a> [name](#input\_name) | Name for resource naming. | `string` | `""` | no |
+| <a name="input_namespace"></a> [namespace](#input\_namespace) | Namespace for resource naming. | `string` | `""` | no |
+| <a name="input_oci_namespace"></a> [oci\_namespace](#input\_oci\_namespace) | The namespace of the OCI Object Storage bucket. | `string` | n/a | yes |
 | <a name="input_permissions_boundary"></a> [permissions\_boundary](#input\_permissions\_boundary) | ARN of the policy that is used to set the permissions boundary for the IAM replication role | `string` | `""` | no |
+| <a name="input_policy_statements"></a> [policy\_statements](#input\_policy\_statements) | List of policy statements to apply to the bucket. | `list(string)` | `[]` | no |
 | <a name="input_prevent_unencrypted_uploads"></a> [prevent\_unencrypted\_uploads](#input\_prevent\_unencrypted\_uploads) | Prevent uploads of unencrypted objects to S3 | `bool` | `true` | no |
-| <a name="input_profile"></a> [profile](#input\_profile) | AWS profile name as set in the shared credentials file | `string` | `""` | no |
+| <a name="input_profile"></a> [profile](#input\_profile) | OCI profile name for authentication. | `string` | `""` | no |
+| <a name="input_public_access_type"></a> [public\_access\_type](#input\_public\_access\_type) | The type of public access for the bucket. Valid values are 'NoPublicAccess', 'ObjectRead', or 'ObjectReadWithoutList'. | `string` | `"NoPublicAccess"` | no |
 | <a name="input_read_capacity"></a> [read\_capacity](#input\_read\_capacity) | DynamoDB read capacity units when using provisioned mode | `number` | `5` | no |
 | <a name="input_regex_replace_chars"></a> [regex\_replace\_chars](#input\_regex\_replace\_chars) | Terraform regular expression (regex) string.<br/>Characters matching the regex will be removed from the ID elements.<br/>If not set, `"/[^a-zA-Z0-9-]/"` is used to remove all characters other than hyphens, letters and digits. | `string` | `null` | no |
 | <a name="input_restrict_public_buckets"></a> [restrict\_public\_buckets](#input\_restrict\_public\_buckets) | Whether Amazon S3 should restrict public bucket policies for this bucket | `bool` | `true` | no |
@@ -304,28 +158,38 @@ Available targets:
 | <a name="input_s3_replication_enabled"></a> [s3\_replication\_enabled](#input\_s3\_replication\_enabled) | Set this to true and specify `s3_replica_bucket_arn` to enable replication | `bool` | `false` | no |
 | <a name="input_source_policy_documents"></a> [source\_policy\_documents](#input\_source\_policy\_documents) | List of IAM policy documents (in JSON format) that are merged together into the generated S3 bucket policy.<br/>Statements must have unique SIDs.<br/>Statement having SIDs that match policy SIDs generated by this module will override them. | `list(string)` | `[]` | no |
 | <a name="input_sse_encryption"></a> [sse\_encryption](#input\_sse\_encryption) | The server-side encryption algorithm to use.<br/>Valid values are `AES256`, `aws:kms`, and `aws:kms:dsse`. | `string` | `"AES256"` | no |
-| <a name="input_stage"></a> [stage](#input\_stage) | ID element. Usually used to indicate role, e.g. 'prod', 'staging', 'source', 'build', 'test', 'deploy', 'release' | `string` | `null` | no |
-| <a name="input_tags"></a> [tags](#input\_tags) | Additional tags (e.g. `{'BusinessUnit': 'XYZ'}`).<br/>Neither the tag keys nor the tag values will be modified by this module. | `map(string)` | `{}` | no |
+| <a name="input_stage"></a> [stage](#input\_stage) | Stage for resource naming. | `string` | `""` | no |
+| <a name="input_storage_tier"></a> [storage\_tier](#input\_storage\_tier) | The storage tier of the bucket. Valid values are 'Standard', 'InfrequentAccess', or 'Archive'. | `string` | `"Standard"` | no |
+| <a name="input_table_enabled"></a> [table\_enabled](#input\_table\_enabled) | Whether to create the OCI NoSQL table. | `bool` | `true` | no |
+| <a name="input_table_name"></a> [table\_name](#input\_table\_name) | Override the name of the NoSQL table. | `string` | `null` | no |
+| <a name="input_tags"></a> [tags](#input\_tags) | A map of tags to assign to resources. | `map(string)` | `{}` | no |
+| <a name="input_tenancy_id"></a> [tenancy\_id](#input\_tenancy\_id) | The OCID of the tenancy. | `string` | n/a | yes |
 | <a name="input_tenant"></a> [tenant](#input\_tenant) | ID element \_(Rarely used, not included by default)\_. A customer identifier, indicating who this instance of a resource is for | `string` | `null` | no |
-| <a name="input_terraform_backend_config_file_name"></a> [terraform\_backend\_config\_file\_name](#input\_terraform\_backend\_config\_file\_name) | (Deprecated) Name of terraform backend config file to generate | `string` | `"terraform.tf"` | no |
-| <a name="input_terraform_backend_config_file_path"></a> [terraform\_backend\_config\_file\_path](#input\_terraform\_backend\_config\_file\_path) | (Deprecated) Directory for the terraform backend config file, usually `.`. The default is to create no file. | `string` | `""` | no |
-| <a name="input_terraform_backend_config_template_file"></a> [terraform\_backend\_config\_template\_file](#input\_terraform\_backend\_config\_template\_file) | (Deprecated) The path to the template used to generate the config file | `string` | `""` | no |
-| <a name="input_terraform_state_file"></a> [terraform\_state\_file](#input\_terraform\_state\_file) | The path to the state file inside the bucket | `string` | `"terraform.tfstate"` | no |
-| <a name="input_terraform_version"></a> [terraform\_version](#input\_terraform\_version) | The minimum required terraform version | `string` | `"1.0.0"` | no |
+| <a name="input_terraform_backend_config_file_name"></a> [terraform\_backend\_config\_file\_name](#input\_terraform\_backend\_config\_file\_name) | Name of the Terraform backend config file to generate. | `string` | `"terraform.tf"` | no |
+| <a name="input_terraform_backend_config_file_path"></a> [terraform\_backend\_config\_file\_path](#input\_terraform\_backend\_config\_file\_path) | Directory for the Terraform backend config file. | `string` | `""` | no |
+| <a name="input_terraform_backend_config_template_file"></a> [terraform\_backend\_config\_template\_file](#input\_terraform\_backend\_config\_template\_file) | The path to the template used to generate the config file. | `string` | `""` | no |
+| <a name="input_terraform_state_file"></a> [terraform\_state\_file](#input\_terraform\_state\_file) | The path to the state file inside the bucket. | `string` | `"terraform.tfstate"` | no |
+| <a name="input_terraform_version"></a> [terraform\_version](#input\_terraform\_version) | The minimum required Terraform version. | `string` | `"1.0.0"` | no |
+| <a name="input_versioning"></a> [versioning](#input\_versioning) | The versioning status of the bucket. Valid values are 'Enabled' or 'Suspended'. | `string` | `"Enabled"` | no |
 | <a name="input_write_capacity"></a> [write\_capacity](#input\_write\_capacity) | DynamoDB write capacity units when using provisioned mode | `number` | `5` | no |
 
 ## Outputs
 
 | Name | Description |
 |------|-------------|
+| <a name="output_bucket_compartment_id"></a> [bucket\_compartment\_id](#output\_bucket\_compartment\_id) | The compartment ID of the OCI Object Storage bucket. |
+| <a name="output_bucket_name"></a> [bucket\_name](#output\_bucket\_name) | The name of the OCI Object Storage bucket. |
+| <a name="output_bucket_namespace"></a> [bucket\_namespace](#output\_bucket\_namespace) | The namespace of the OCI Object Storage bucket. |
 | <a name="output_dynamodb_table_arn"></a> [dynamodb\_table\_arn](#output\_dynamodb\_table\_arn) | DynamoDB table ARN |
 | <a name="output_dynamodb_table_id"></a> [dynamodb\_table\_id](#output\_dynamodb\_table\_id) | DynamoDB table ID |
 | <a name="output_dynamodb_table_name"></a> [dynamodb\_table\_name](#output\_dynamodb\_table\_name) | DynamoDB table name |
+| <a name="output_nosql_table_compartment_id"></a> [nosql\_table\_compartment\_id](#output\_nosql\_table\_compartment\_id) | The compartment ID of the OCI NoSQL table. |
+| <a name="output_nosql_table_name"></a> [nosql\_table\_name](#output\_nosql\_table\_name) | The name of the OCI NoSQL table. |
 | <a name="output_s3_bucket_arn"></a> [s3\_bucket\_arn](#output\_s3\_bucket\_arn) | S3 bucket ARN |
 | <a name="output_s3_bucket_domain_name"></a> [s3\_bucket\_domain\_name](#output\_s3\_bucket\_domain\_name) | S3 bucket domain name |
 | <a name="output_s3_bucket_id"></a> [s3\_bucket\_id](#output\_s3\_bucket\_id) | S3 bucket ID |
 | <a name="output_s3_replication_role_arn"></a> [s3\_replication\_role\_arn](#output\_s3\_replication\_role\_arn) | The ARN of the IAM Role created for replication, if enabled. |
-| <a name="output_terraform_backend_config"></a> [terraform\_backend\_config](#output\_terraform\_backend\_config) | Rendered Terraform backend config file |
+| <a name="output_terraform_backend_config"></a> [terraform\_backend\_config](#output\_terraform\_backend\_config) | Rendered Terraform backend config file. |
 <!-- markdownlint-restore -->
 
 
@@ -333,8 +197,8 @@ Available targets:
 
 Check out these related projects.
 
-- [terraform-aws-dynamodb](https://github.com/cloudposse/terraform-aws-dynamodb) - Terraform module that implements AWS DynamoDB with support for AutoScaling
-- [terraform-aws-dynamodb-autoscaler](https://github.com/cloudposse/terraform-aws-dynamodb-autoscaler) - Terraform module to provision DynamoDB autoscaler
+- [terraform-oci-nosql](https://github.com/cloudposse/terraform-oci-nosql) - Terraform module that implements OCI NoSQL Table with support for AutoScaling
+- [terraform-oci-object-storage](https://github.com/cloudposse/terraform-oci-object-storage) - Terraform module to provision OCI Object Storage bucket
 
 
 > [!TIP]

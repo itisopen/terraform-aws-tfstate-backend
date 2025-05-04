@@ -1,19 +1,14 @@
-output "s3_bucket_id" {
-  value       = module.tfstate_backend.s3_bucket_id
-  description = "S3 bucket ID"
+output "bucket_name" {
+  description = "The name of the OCI Object Storage bucket."
+  value       = oci_objectstorage_bucket.default[0].name
 }
 
-output "s3_replication_role_arn" {
-  value       = module.tfstate_backend.s3_replication_role_arn
-  description = "The ARN of the IAM Role created for replication, if enabled."
+output "bucket_namespace" {
+  description = "The namespace of the OCI Object Storage bucket."
+  value       = oci_objectstorage_bucket.default[0].namespace
 }
 
-output "dynamodb_table_name" {
-  value       = module.tfstate_backend.dynamodb_table_name
-  description = "DynamoDB table name"
-}
-
-output "dynamodb_table_id" {
-  value       = module.tfstate_backend.dynamodb_table_id
-  description = "DynamoDB table ID"
+output "bucket_compartment_id" {
+  description = "The compartment ID of the OCI Object Storage bucket."
+  value       = oci_objectstorage_bucket.default[0].compartment_id
 }

@@ -1,31 +1,47 @@
-provider "aws" {
-  region = var.region
-}
-
-#S3 access controls, policies and logging should be created as seperate terraform resources
-#tfsec:ignore:aws-s3-block-public-acls tfsec:ignore:aws-s3-block-public-policy tfsec:ignore:aws-s3-enable-bucket-encryption tfsec:ignore:aws-s3-encryption-customer-key tfsec:ignore:aws-s3-ignore-public-acls tfsec:ignore:aws-s3-no-public-buckets tfsec:ignore:aws-s3-enable-bucket-logging tfsec:ignore:aws-s3-enable-versioning tfsec:ignore:aws-s3-specify-public-access-block
-resource "aws_s3_bucket" "default" {
+resource "oci_objectstorage_bucket" "default" {
   count = module.this.enabled ? 1 : 0
 
-  bucket = "${module.this.id}-logs"
+  compartment_id = var.oci_compartment_id
+  name           = "${module.this.id}-logs"
+  namespace      = var.oci_namespace
+
+  #Optional
+  access_type = var.access_type
+  auto_tiering = var.auto_tiering
+  #defined_tags = {"Operations.CostCenter"= "42"}
+  freeform_tags = {"Department"= "Finance"}
+  kms_key_id = var.kms_master_key_id
+  metadata = var.metadata
+  object_events_enabled = var.object_events_enabled
+  storage_tier = var.storage_tier
+  retention_rules {
+      display_name = var.retention_rule_display_name
+      duration {
+          #Required
+          time_amount = var.retention_rule_duration_time_amount
+          time_unit = var.retention_rule_duration_time_unit
+      }
+      time_rule_locked = var.retention_rule_time_rule_locked
+  }
+  versioning = var.versioning
 }
 
 module "tfstate_backend" {
   source = "../../"
 
-  force_destroy = true
+  bucket_enabled = var.bucket_enabled
+  table_enabled  = var.table_enabled
 
-  bucket_enabled   = var.bucket_enabled
-  dynamodb_enabled = var.dynamodb_enabled
+  oci_tenancy_ocid      = var.oci_tenancy_ocid
+  compartment_id  = var.oci_compartment_id
+  oci_namespace   = var.oci_namespace
 
   logging = [
     {
-      target_bucket = one(aws_s3_bucket.default[*].id)
+      target_bucket = one(oci_objectstorage_bucket.default[*].name)
       target_prefix = "tfstate/"
     }
   ]
-
-  bucket_ownership_enforced_enabled = true
 
   context = module.this.context
 }
